@@ -1,0 +1,9 @@
+[postgresql]
+shared_buffers = 1GB
+effective_cache_size = 1GB
+work_mem = 8MB
+maintenance_work_mem = 16MB
+wal_buffers = 8MB
+wal_writer_delay = 10ms
+checkpoint_segments = 3
+checkpoint_timeout = 5min
