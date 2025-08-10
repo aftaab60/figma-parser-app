@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS figma_files (
     parsed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ,
-    deleted_at TIMESTAMPTZ
+    active BOOLEAN DEFAULT TRUE NOT NULL
 );
 
 -- Table for storing extracted Figma components
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS components (
     properties JSONB,
     created_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ,
-    deleted_at TIMESTAMPTZ,
+    active BOOLEAN DEFAULT TRUE NOT NULL,
     CONSTRAINT fk_components_figma_file FOREIGN KEY (figma_file_id) REFERENCES figma_files (id) ON DELETE CASCADE
 );
 
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS instances (
     properties JSONB,
     created_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ,
-    deleted_at TIMESTAMPTZ,
+    active BOOLEAN DEFAULT TRUE NOT NULL,
     CONSTRAINT fk_instances_component FOREIGN KEY (component_id) REFERENCES components (id) ON DELETE CASCADE
 );
 
