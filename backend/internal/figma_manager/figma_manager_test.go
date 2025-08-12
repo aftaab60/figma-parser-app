@@ -110,6 +110,63 @@ func TestFigmaManager_Integration_SampleData(t *testing.T) {
 		}
 	})
 
+	t.Run("Test Instances Only Extraction", func(t *testing.T) {
+		manager := figma_manager.NewFigmaManager(apiToken)
+		fileKey := "DNCLfE7Tf8A0mudOOLZUYx"
+
+		// First extract components to see what's available
+		components, err := manager.ExtractComponentsFromFile(fileKey)
+		if err != nil {
+			t.Fatalf("Failed to extract components: %v", err)
+		}
+		t.Logf("Found %d components for instance matching", len(components))
+
+		// Log component node IDs for debugging
+		if len(components) > 0 {
+			t.Logf("Component NodeIDs:")
+			for i, comp := range components[:min(3, len(components))] {
+				t.Logf("  %d. %s (NodeID: %s, Type: %s)", i+1, comp.Name, comp.NodeID, comp.Type)
+			}
+		}
+
+		instances, err := manager.ExtractInstancesFromFile(fileKey)
+		if err != nil {
+			t.Fatalf("Failed to extract instances: %v", err)
+		}
+
+		t.Logf("Extracted %d instances only", len(instances))
+
+		// Validate instance properties
+		for _, instance := range instances {
+			if instance.NodeID == "" {
+				t.Error("Instance missing NodeID")
+			}
+			if instance.Name == "" {
+				t.Error("Instance missing Name")
+			}
+			if instance.ComponentID <= 0 {
+				t.Error("Instance missing or invalid ComponentID")
+			}
+			// Validate position and size
+			if instance.Width <= 0 || instance.Height <= 0 {
+				t.Errorf("Instance %s has invalid dimensions: %.1fx%.1f", instance.Name, instance.Width, instance.Height)
+			}
+		}
+
+		// Log first few instances for debugging
+		if len(instances) > 0 {
+			t.Logf("First few instances:")
+			for i, instance := range instances[:min(3, len(instances))] {
+				t.Logf("%d. %s (Component ID: %d) - Position: (%.1f, %.1f), Size: %.1fx%.1f",
+					i+1, instance.Name, instance.ComponentID,
+					instance.X, instance.Y, instance.Width, instance.Height)
+			}
+			if len(instances) > 3 {
+				t.Logf("... and %d more instances", len(instances)-3)
+			}
+		}
+	})
+
 	t.Run("Test File Parsing With Images", func(t *testing.T) {
 		manager := figma_manager.NewFigmaManager(apiToken)
 		fileKey := "DNCLfE7Tf8A0mudOOLZUYx"

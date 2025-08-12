@@ -16,7 +16,7 @@ func NewFigmaParser() *FigmaParser {
 }
 
 // ParseFile parses a complete Figma API response into structured data
-func (p *FigmaParser) ParseFile(apiResponse *FigmaAPIResponse, fileKey string) (*ParsedFigmaData, error) {
+func (p *FigmaParser) ParseFile(apiResponse *FigmaAPIResponse, fileKey string, originalURL string) (*ParsedFigmaData, error) {
 	if apiResponse == nil {
 		return nil, fmt.Errorf("API response cannot be nil")
 	}
@@ -30,6 +30,7 @@ func (p *FigmaParser) ParseFile(apiResponse *FigmaAPIResponse, fileKey string) (
 	// Create the FigmaFile model
 	figmaFile := &models.FigmaFile{
 		Name:         apiResponse.Name,
+		URL:          originalURL, // Store the original URL
 		FileKey:      fileKey,
 		ImageURL:     apiResponse.ThumbnailURL,
 		CanvasWidth:  canvasWidth,
@@ -53,16 +54,22 @@ func (p *FigmaParser) ParseFile(apiResponse *FigmaAPIResponse, fileKey string) (
 	// Combine components from API and nodes
 	allComponents := append(components, nodeComponents...)
 
+	// Deduplicate components by node_id to avoid constraint violations
+	deduplicatedComponents := p.deduplicateComponents(allComponents)
+
 	// Extract instances from document nodes
-	instances, err := p.ExtractInstances([]Node{apiResponse.Document}, allComponents)
+	instances, err := p.ExtractInstances([]Node{apiResponse.Document}, deduplicatedComponents)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract instances: %w", err)
 	}
 
+	// Deduplicate instances by node_id to avoid constraint violations
+	deduplicatedInstances := p.deduplicateInstances(instances)
+
 	return &ParsedFigmaData{
 		File:       figmaFile,
-		Components: allComponents,
-		Instances:  instances,
+		Components: deduplicatedComponents,
+		Instances:  deduplicatedInstances,
 	}, nil
 }
 
@@ -97,10 +104,10 @@ func (p *FigmaParser) ExtractInstances(nodes []Node, components []models.Compone
 	for _, node := range nodes {
 		// Check if this node is an instance
 		if node.Type == "INSTANCE" && node.ComponentID != "" {
-			// Find the corresponding component
-			componentID := p.findComponentIDByNodeID(node.ComponentID, components)
-			if componentID > 0 {
-				instance := p.nodeToInstance(node, componentID)
+			// Find the corresponding component index for temporary linking
+			componentIndex := p.findComponentIDByNodeID(node.ComponentID, components)
+			if componentIndex > 0 {
+				instance := p.nodeToInstance(node, componentIndex)
 				instances = append(instances, instance)
 			}
 		}
@@ -203,9 +210,10 @@ func (p *FigmaParser) nodeToComponent(node Node, fileID int64) models.Component 
 }
 
 // nodeToInstance converts a Figma node to an Instance model
-func (p *FigmaParser) nodeToInstance(node Node, componentID int64) models.Instance {
+// The componentIndex is temporary for parsing - actual DB relationships will be resolved during insertion
+func (p *FigmaParser) nodeToInstance(node Node, componentIndex int64) models.Instance {
 	instance := models.Instance{
-		ComponentID: componentID,
+		ComponentID: componentIndex, // Temporary index for parsing, will be resolved during DB insertion
 		NodeID:      node.ID,
 		Name:        node.Name,
 		Active:      true,
@@ -226,6 +234,18 @@ func (p *FigmaParser) nodeToInstance(node Node, componentID int64) models.Instan
 
 	// Set z-index based on position in tree (simplified)
 	instance.ZIndex = 0 // This could be enhanced with proper z-index calculation
+
+	// Store the original Figma componentId in properties for later resolution
+	additionalProps := make(map[string]interface{})
+	additionalProps["figmaComponentId"] = node.ComponentID
+	if node.Visible != nil {
+		additionalProps["visible"] = *node.Visible
+	}
+
+	if len(additionalProps) > 0 {
+		propsJSON, _ := json.Marshal(additionalProps)
+		instance.Properties = propsJSON
+	}
 
 	return instance
 }
@@ -276,11 +296,12 @@ func (p *FigmaParser) findNodeByID(node Node, targetID string) *Node {
 	return nil
 }
 
-// findComponentIDByNodeID finds the database ID of a component by its node ID
+// findComponentIDByNodeID finds a component by its Figma node ID
+// Returns the array index + 1 as a temporary reference for linking during parsing
 func (p *FigmaParser) findComponentIDByNodeID(nodeID string, components []models.Component) int64 {
-	for _, component := range components {
+	for i, component := range components {
 		if component.NodeID == nodeID {
-			return component.ID
+			return int64(i + 1) // Temporary reference ID
 		}
 	}
 	return 0
@@ -331,4 +352,36 @@ func (p *FigmaParser) setZIndexForNode(node Node, zIndex int) Node {
 	// This is a simplified approach - in a real implementation,
 	// you might want to store this in the additional properties
 	return node
+}
+
+// deduplicateComponents removes duplicate components based on node_id
+// This prevents constraint violations when saving to database
+func (p *FigmaParser) deduplicateComponents(components []models.Component) []models.Component {
+	seen := make(map[string]bool)
+	var deduplicated []models.Component
+
+	for _, component := range components {
+		if !seen[component.NodeID] {
+			seen[component.NodeID] = true
+			deduplicated = append(deduplicated, component)
+		}
+	}
+
+	return deduplicated
+}
+
+// deduplicateInstances removes duplicate instances based on node_id
+// This prevents constraint violations when saving to database
+func (p *FigmaParser) deduplicateInstances(instances []models.Instance) []models.Instance {
+	seen := make(map[string]bool)
+	var deduplicated []models.Instance
+
+	for _, instance := range instances {
+		if !seen[instance.NodeID] {
+			seen[instance.NodeID] = true
+			deduplicated = append(deduplicated, instance)
+		}
+	}
+
+	return deduplicated
 }

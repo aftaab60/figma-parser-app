@@ -44,7 +44,19 @@ func (m *FigmaManager) ParseFigmaFileFromURL(figmaURL string) (*ParsedFigmaData,
 		return nil, fmt.Errorf("failed to extract file key from URL: %w", err)
 	}
 
-	return m.ParseFigmaFileFromKey(fileKey)
+	// Get file data from Figma API
+	apiResponse, err := m.client.GetFile(fileKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
+	}
+
+	// Parse the API response into our models, passing the original URL
+	parsedData, err := m.parser.ParseFile(apiResponse, fileKey, figmaURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse file data: %w", err)
+	}
+
+	return parsedData, nil
 }
 
 // ParseFigmaFileFromKey parses a Figma file from file key and returns structured data
@@ -59,8 +71,8 @@ func (m *FigmaManager) ParseFigmaFileFromKey(fileKey string) (*ParsedFigmaData, 
 		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
 	}
 
-	// Parse the API response into our models
-	parsedData, err := m.parser.ParseFile(apiResponse, fileKey)
+	// Parse the API response into our models (no original URL available when parsing from key only)
+	parsedData, err := m.parser.ParseFile(apiResponse, fileKey, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse file data: %w", err)
 	}
