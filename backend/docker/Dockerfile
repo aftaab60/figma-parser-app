@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24.6-alpine AS builder
 
 WORKDIR /app
 
@@ -9,12 +9,12 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /bin/backend-service .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o backend-service .
 
 # Create the final, small production image
 FROM alpine:latest
 
 WORKDIR /root/
-COPY --from=builder /app/bin/backend-service .
+COPY --from=builder /app/backend-service .
 EXPOSE 3000
 CMD ["./backend-service"]

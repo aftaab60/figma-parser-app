@@ -40,6 +40,14 @@ func setupRoutes(r *gin.Engine) {
 	instancesRepo := repositories.NewInstancesRepository(*db)
 	parserHandler := handler.NewParserHandler(*services.NewParserService(figmaManager, figmaFilesRepo, componentsRepo, instancesRepo))
 
+	// Health check endpoint
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "healthy",
+			"service": "figma-parser-backend",
+		})
+	})
+
 	// Apply middleware to routes that need Figma token validation
 	r.POST("/parse-figma-file", middlewares.ValidateFigmaToken(figmaManager), parserHandler.ParseAndSaveFigmaFile)
 	r.GET("/figma-files/:id", parserHandler.GetFigmaFileDetails) // No token needed for reading from DB

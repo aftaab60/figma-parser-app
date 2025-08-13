@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	_ "github.com/lib/pq"
@@ -21,16 +22,17 @@ var db *DB
 
 func InitPgsqlConnection() *DB {
 	once.Do(func() {
-		//TODO: setup to read from config file. For example config.yml
-		//for now, hardcoded it with values in docker container
-		dbHost := "localhost"
-		dbPort := "5432"
-		dbUser := "user"
-		dbPassword := "password"
-		dbName := "parser_db"
+		//for now, using environment variables with fallback to defaults
+		dbHost := getEnvOrDefault("DB_HOST", "localhost")
+		dbPort := getEnvOrDefault("DB_PORT", "5432")
+		dbUser := getEnvOrDefault("DB_USER", "user")
+		dbPassword := getEnvOrDefault("DB_PASSWORD", "password")
+		dbName := getEnvOrDefault("DB_NAME", "parser_db")
 
 		dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 			dbHost, dbPort, dbUser, dbPassword, dbName)
+
+		log.Printf("Attempting to connect to database with host=%s port=%s user=%s dbname=%s", dbHost, dbPort, dbUser, dbName)
 
 		var err error
 		dbpgsql, err := sql.Open("postgres", dsn)
@@ -91,6 +93,14 @@ func (d *DB) GetRecords(ctx context.Context, query string, args ...interface{}) 
 
 func (d *DB) Begin() (*sql.Tx, error) {
 	return d.db.Begin()
+}
+
+// getEnvOrDefault returns the environment variable value or the default if not set
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 func CloseDB() {
