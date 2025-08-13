@@ -24,7 +24,7 @@ func NewComponentsRepository(db db_manager.DB) *ComponentsRepository {
 }
 
 func (r *ComponentsRepository) GetComponentByID(ctx context.Context, id int64) (*models.Component, error) {
-	query := "SELECT id, figma_file_id, node_id, name, type, description, x, y, width, height, z_index, properties, created_at, updated_at, active FROM components WHERE id = $1 AND active = TRUE"
+	query := "SELECT id, figma_file_id, node_id, name, type, description, x, y, width, height, properties, created_at, updated_at, active FROM components WHERE id = $1 AND active = TRUE"
 	var component models.Component
 	// scanning to individual columns for backward compatibility in future. This is better than using * and scanning to struct directly
 	err := r.DB.GetRecord(ctx, query, id).Scan(
@@ -38,7 +38,6 @@ func (r *ComponentsRepository) GetComponentByID(ctx context.Context, id int64) (
 		&component.Y,
 		&component.Width,
 		&component.Height,
-		&component.ZIndex,
 		&component.Properties,
 		&component.CreatedAt,
 		&component.UpdatedAt,
@@ -50,7 +49,7 @@ func (r *ComponentsRepository) GetComponentByID(ctx context.Context, id int64) (
 }
 
 func (r *ComponentsRepository) GetComponentsByFigmaFileID(ctx context.Context, figmaFileID int64) ([]models.Component, error) {
-	query := "SELECT id, figma_file_id, node_id, name, type, description, x, y, width, height, z_index, properties, created_at, updated_at, active FROM components WHERE figma_file_id = $1 AND active = TRUE ORDER BY z_index ASC"
+	query := "SELECT id, figma_file_id, node_id, name, type, description, x, y, width, height, properties, created_at, updated_at, active FROM components WHERE figma_file_id = $1 AND active = TRUE ORDER BY created_at ASC"
 	rows, err := r.DB.GetRecords(ctx, query, figmaFileID)
 	if err != nil {
 		return nil, err
@@ -71,7 +70,6 @@ func (r *ComponentsRepository) GetComponentsByFigmaFileID(ctx context.Context, f
 			&component.Y,
 			&component.Width,
 			&component.Height,
-			&component.ZIndex,
 			&component.Properties,
 			&component.CreatedAt,
 			&component.UpdatedAt,
@@ -90,7 +88,7 @@ func (r *ComponentsRepository) GetComponentsByFigmaFileID(ctx context.Context, f
 }
 
 func (r *ComponentsRepository) CreateComponent(ctx context.Context, component *models.Component) (*models.Component, error) {
-	query := "INSERT INTO components (figma_file_id, node_id, name, type, description, x, y, width, height, z_index, properties, created_at, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW(), TRUE) RETURNING id, created_at, updated_at"
+	query := "INSERT INTO components (figma_file_id, node_id, name, type, description, x, y, width, height, properties, created_at, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW(), TRUE) RETURNING id, created_at, updated_at"
 	err := r.DB.CreateRecord(ctx, query,
 		component.FigmaFileID,
 		component.NodeID,
@@ -101,7 +99,6 @@ func (r *ComponentsRepository) CreateComponent(ctx context.Context, component *m
 		component.Y,
 		component.Width,
 		component.Height,
-		component.ZIndex,
 		component.Properties).Scan(&component.ID, &component.CreatedAt, &component.UpdatedAt)
 	if err != nil {
 		return nil, err

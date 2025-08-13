@@ -12,14 +12,10 @@ import (
 type IFigmaManager interface {
 	ParseFigmaFileFromURL(ctx context.Context, figmaURL string) (*ParsedFigmaData, error)
 	ParseFigmaFileFromKey(ctx context.Context, fileKey string) (*ParsedFigmaData, error)
+	ParseFigmaFileWithImages(ctx context.Context, fileKey string) (*ParsedFigmaData, map[string]string, error)
 
 	ExtractComponentsFromFile(ctx context.Context, fileKey string) ([]models.Component, error)
 	ExtractInstancesFromFile(ctx context.Context, fileKey string) ([]models.Instance, error)
-	ParseFigmaFileWithImages(ctx context.Context, fileKey string) (*ParsedFigmaData, map[string]string, error)
-	GetFileImages(ctx context.Context, fileKey string, nodeIDs []string) (map[string]string, error)
-	GetFileNodes(ctx context.Context, fileKey string, nodeIDs []string) (*FigmaAPIResponse, error)
-	ValidateFileAccess(ctx context.Context, fileKey string) error
-
 	ValidateFigmaToken(token string) error
 }
 
@@ -74,7 +70,7 @@ func (m *FigmaManager) ParseFigmaFileFromKey(ctx context.Context, fileKey string
 		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
 	}
 
-	// Parse the API response into our models (no original URL available when parsing from key only)
+	// original URL not available when parsing from key only
 	parsedData, err := m.parser.ParseFile(apiResponse, fileKey, "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse file data: %w", err)
@@ -140,11 +136,6 @@ func (m *FigmaManager) extractFileKeyFromURL(figmaURL string) (string, error) {
 	// Clean the URL
 	figmaURL = strings.TrimSpace(figmaURL)
 
-	// Figma file URL patterns:
-	// https://www.figma.com/file/{file-key}/{file-name}
-	// https://www.figma.com/design/{file-key}/{file-name}
-	// https://figma.com/file/{file-key}/{file-name}
-
 	patterns := []string{
 		`(?:https?://)?(?:www\.)?figma\.com/file/([a-zA-Z0-9]+)`,
 		`(?:https?://)?(?:www\.)?figma\.com/design/([a-zA-Z0-9]+)`,
@@ -166,44 +157,9 @@ func (m *FigmaManager) extractFileKeyFromURL(figmaURL string) (string, error) {
 	return "", fmt.Errorf("invalid Figma URL format: %s", figmaURL)
 }
 
-// isValidFileKey checks if a string looks like a valid Figma file key
 func isValidFileKey(key string) bool {
-	// Figma file keys are typically alphanumeric strings
 	matched, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, key)
-	return matched && len(key) > 10 // Figma keys are usually longer than 10 characters
-}
-
-// GetFileImages gets images for specific nodes (utility method)
-func (m *FigmaManager) GetFileImages(ctx context.Context, fileKey string, nodeIDs []string) (map[string]string, error) {
-	if fileKey == "" {
-		return nil, fmt.Errorf("file key cannot be empty")
-	}
-
-	return m.client.GetFileImages(ctx, fileKey, nodeIDs)
-}
-
-// GetFileNodes gets specific nodes from a file (utility method)
-func (m *FigmaManager) GetFileNodes(ctx context.Context, fileKey string, nodeIDs []string) (*FigmaAPIResponse, error) {
-	if fileKey == "" {
-		return nil, fmt.Errorf("file key cannot be empty")
-	}
-
-	return m.client.GetFileNodes(ctx, fileKey, nodeIDs)
-}
-
-// ValidateFileAccess checks if we can access a Figma file
-func (m *FigmaManager) ValidateFileAccess(ctx context.Context, fileKey string) error {
-	if fileKey == "" {
-		return fmt.Errorf("file key cannot be empty")
-	}
-
-	// Try to get basic file info
-	_, err := m.client.GetFile(ctx, fileKey)
-	if err != nil {
-		return fmt.Errorf("cannot access Figma file: %w", err)
-	}
-
-	return nil
+	return matched && len(key) > 10 // Figma keys are longer than 10 characters
 }
 
 // ParseFigmaFileWithImages parses a file and also fetches images for components

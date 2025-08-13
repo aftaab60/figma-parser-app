@@ -31,25 +31,24 @@ func NewParserService(
 
 // ParseAndSaveFigmaFile - Main method that accepts Figma URL and saves all extracted data
 func (s *ParserService) ParseAndSaveFigmaFile(ctx context.Context, figmaURL string) (*models.FigmaFile, error) {
-	// 1. Parse Figma file from URL
 	parsedData, err := s.FigmaManager.ParseFigmaFileFromURL(ctx, figmaURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Figma file: %w", err)
 	}
 
-	// 2. Save the Figma file record first
+	// Save the Figma file record first
 	savedFile, err := s.FigmaFilesRepository.CreateFigmaFile(ctx, parsedData.File)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save Figma file: %w", err)
 	}
 
-	// 3. Save components with the file ID
+	// Save components with the file ID
 	savedComponents, err := s.saveComponents(ctx, parsedData.Components, savedFile.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save components: %w", err)
 	}
 
-	// 4. Save instances with proper component references
+	// Save instances with proper component references
 	err = s.saveInstances(ctx, parsedData.Instances, savedComponents)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save instances: %w", err)
@@ -83,33 +82,6 @@ func (s *ParserService) GetFigmaFileWithDetails(ctx context.Context, fileID int6
 		Components: components,
 		Instances:  instances,
 	}, nil
-}
-
-// GetComponentsByFileID - Get all components for a specific file
-func (s *ParserService) GetComponentsByFileID(ctx context.Context, fileID int64) ([]models.Component, error) {
-	return s.ComponentsRepository.GetComponentsByFigmaFileID(ctx, fileID)
-}
-
-// GetInstancesByComponentID - Get all instances for a specific component
-func (s *ParserService) GetInstancesByComponentID(ctx context.Context, componentID int64) ([]models.Instance, error) {
-	return s.InstancesRepository.GetInstancesByComponentID(ctx, componentID)
-}
-
-// GetInstancesByFileID - Get all instances for a specific file
-func (s *ParserService) GetInstancesByFileID(ctx context.Context, fileID int64) ([]models.Instance, error) {
-	return s.InstancesRepository.GetInstancesByFigmaFileID(ctx, fileID)
-}
-
-// ValidateFigmaURL - Check if a Figma URL is accessible before parsing
-func (s *ParserService) ValidateFigmaURL(ctx context.Context, figmaURL string) error {
-	// Extract file key from URL and validate access
-	parsedData, err := s.FigmaManager.ParseFigmaFileFromURL(ctx, figmaURL)
-	if err != nil {
-		return fmt.Errorf("invalid Figma URL or inaccessible file: %w", err)
-	}
-
-	// Just validate access, don't save anything
-	return s.FigmaManager.ValidateFileAccess(ctx, parsedData.File.FileKey)
 }
 
 // saveComponents saves components and returns the saved components with database IDs

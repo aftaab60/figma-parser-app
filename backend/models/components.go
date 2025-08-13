@@ -18,7 +18,6 @@ type Component struct {
 	Y           float64         `json:"y"`
 	Width       float64         `json:"width"`
 	Height      float64         `json:"height"`
-	ZIndex      int             `json:"z_index"`
 	Properties  json.RawMessage `json:"properties,omitempty"` // Use json.RawMessage for JSONB
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`

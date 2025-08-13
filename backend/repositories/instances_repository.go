@@ -25,7 +25,7 @@ func NewInstancesRepository(db db_manager.DB) *InstancesRepository {
 }
 
 func (r *InstancesRepository) GetInstanceByID(ctx context.Context, id int64) (*models.Instance, error) {
-	query := "SELECT id, component_id, node_id, name, x, y, width, height, z_index, properties, created_at, updated_at, active FROM instances WHERE id = $1 AND active = TRUE"
+	query := "SELECT id, component_id, node_id, name, x, y, width, height, properties, created_at, updated_at, active FROM instances WHERE id = $1 AND active = TRUE"
 	var instance models.Instance
 	// scanning to individual columns for backward compatibility in future. This is better than using * and scanning to struct directly
 	err := r.DB.GetRecord(ctx, query, id).Scan(
@@ -37,7 +37,6 @@ func (r *InstancesRepository) GetInstanceByID(ctx context.Context, id int64) (*m
 		&instance.Y,
 		&instance.Width,
 		&instance.Height,
-		&instance.ZIndex,
 		&instance.Properties,
 		&instance.CreatedAt,
 		&instance.UpdatedAt,
@@ -49,7 +48,7 @@ func (r *InstancesRepository) GetInstanceByID(ctx context.Context, id int64) (*m
 }
 
 func (r *InstancesRepository) GetInstancesByComponentID(ctx context.Context, componentID int64) ([]models.Instance, error) {
-	query := "SELECT id, component_id, node_id, name, x, y, width, height, z_index, properties, created_at, updated_at, active FROM instances WHERE component_id = $1 AND active = TRUE ORDER BY z_index ASC"
+	query := "SELECT id, component_id, node_id, name, x, y, width, height, properties, created_at, updated_at, active FROM instances WHERE component_id = $1 AND active = TRUE ORDER BY created_at ASC"
 	rows, err := r.DB.GetRecords(ctx, query, componentID)
 	if err != nil {
 		return nil, err
@@ -68,7 +67,6 @@ func (r *InstancesRepository) GetInstancesByComponentID(ctx context.Context, com
 			&instance.Y,
 			&instance.Width,
 			&instance.Height,
-			&instance.ZIndex,
 			&instance.Properties,
 			&instance.CreatedAt,
 			&instance.UpdatedAt,
@@ -87,11 +85,11 @@ func (r *InstancesRepository) GetInstancesByComponentID(ctx context.Context, com
 }
 
 func (r *InstancesRepository) GetInstancesByFigmaFileID(ctx context.Context, figmaFileID int64) ([]models.Instance, error) {
-	query := `SELECT i.id, i.component_id, i.node_id, i.name, i.x, i.y, i.width, i.height, i.z_index, i.properties, i.created_at, i.updated_at, i.active 
+	query := `SELECT i.id, i.component_id, i.node_id, i.name, i.x, i.y, i.width, i.height, i.properties, i.created_at, i.updated_at, i.active 
 			  FROM instances i 
 			  INNER JOIN components c ON i.component_id = c.id 
 			  WHERE c.figma_file_id = $1 AND i.active = TRUE AND c.active = TRUE 
-			  ORDER BY i.z_index ASC`
+			  ORDER BY i.created_at ASC`
 	rows, err := r.DB.GetRecords(ctx, query, figmaFileID)
 	if err != nil {
 		return nil, err
@@ -110,7 +108,6 @@ func (r *InstancesRepository) GetInstancesByFigmaFileID(ctx context.Context, fig
 			&instance.Y,
 			&instance.Width,
 			&instance.Height,
-			&instance.ZIndex,
 			&instance.Properties,
 			&instance.CreatedAt,
 			&instance.UpdatedAt,
@@ -129,7 +126,7 @@ func (r *InstancesRepository) GetInstancesByFigmaFileID(ctx context.Context, fig
 }
 
 func (r *InstancesRepository) CreateInstance(ctx context.Context, instance *models.Instance) (*models.Instance, error) {
-	query := "INSERT INTO instances (component_id, node_id, name, x, y, width, height, z_index, properties, created_at, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), TRUE) RETURNING id, created_at, updated_at"
+	query := "INSERT INTO instances (component_id, node_id, name, x, y, width, height, properties, created_at, updated_at, active) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW(), TRUE) RETURNING id, created_at, updated_at"
 	err := r.DB.CreateRecord(ctx, query,
 		instance.ComponentID,
 		instance.NodeID,
@@ -138,7 +135,6 @@ func (r *InstancesRepository) CreateInstance(ctx context.Context, instance *mode
 		instance.Y,
 		instance.Width,
 		instance.Height,
-		instance.ZIndex,
 		instance.Properties).Scan(&instance.ID, &instance.CreatedAt, &instance.UpdatedAt)
 	if err != nil {
 		return nil, err

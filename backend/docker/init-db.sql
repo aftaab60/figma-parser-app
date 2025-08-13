@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS components (
     y DOUBLE PRECISION,
     width DOUBLE PRECISION,
     height DOUBLE PRECISION,
-    z_index INTEGER, -- to control stacking order
     properties JSONB,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -51,7 +50,6 @@ CREATE TABLE IF NOT EXISTS instances (
     y DOUBLE PRECISION,
     width DOUBLE PRECISION,
     height DOUBLE PRECISION,
-    z_index INTEGER, -- to control stacking order
     properties JSONB,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

@@ -64,39 +64,6 @@ func (c *FigmaClient) GetFile(ctx context.Context, fileKeyOrURL string) (*FigmaA
 	return &figmaResponse, nil
 }
 
-// GetFileNodes retrieves specific nodes from a Figma file
-func (c *FigmaClient) GetFileNodes(ctx context.Context, fileKey string, nodeIDs []string) (*FigmaAPIResponse, error) {
-	if fileKey == "" {
-		return nil, fmt.Errorf("file key cannot be empty")
-	}
-	if len(nodeIDs) == 0 {
-		return nil, fmt.Errorf("node IDs cannot be empty")
-	}
-
-	// Clean the file key
-	fileKey = c.extractFileKeyFromURL(fileKey)
-
-	// Build the endpoint with node IDs as query parameters
-	endpoint := fmt.Sprintf("%s/files/%s/nodes", c.baseURL, fileKey)
-
-	// Add node IDs as query parameters
-	params := url.Values{}
-	params.Add("ids", strings.Join(nodeIDs, ","))
-	endpoint += "?" + params.Encode()
-
-	response, err := c.makeRequest(ctx, "GET", endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file nodes from Figma API: %w", err)
-	}
-
-	var figmaResponse FigmaAPIResponse
-	if err := json.Unmarshal(response, &figmaResponse); err != nil {
-		return nil, fmt.Errorf("failed to parse Figma API response: %w", err)
-	}
-
-	return &figmaResponse, nil
-}
-
 // GetFileImages retrieves rendered images for specific nodes
 func (c *FigmaClient) GetFileImages(ctx context.Context, fileKey string, nodeIDs []string) (map[string]string, error) {
 	if fileKey == "" {
