@@ -62,3 +62,8 @@ figma-parser-app/
     "figma_file_url": "https://www.figma.com/design/DNCLfE7Tf8A0mudOOLZUYx/Locofy.ai.test?t=94QjDVDsuj5cHJEU-1"
 }'```
 ````
+
+### Local execution result
+<img width="1272" height="784" alt="image" src="https://github.com/user-attachments/assets/907d2fdb-c79c-4ff1-808c-cab8b1341773" />
+
+<img width="1146" height="803" alt="image" src="https://github.com/user-attachments/assets/b90d239b-353c-415c-af7d-835d65d516bf" />
