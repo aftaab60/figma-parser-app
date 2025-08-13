@@ -1,6 +1,7 @@
 package figma_manager
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,17 +17,13 @@ const (
 	DefaultTimeout = 30 * time.Second
 )
 
-// FigmaClient implements the IFigmaClient interface
 type FigmaClient struct {
-	apiToken   string
 	httpClient *http.Client
 	baseURL    string
 }
 
-// NewFigmaClient creates a new Figma API client
-func NewFigmaClient(apiToken string) *FigmaClient {
+func NewFigmaClient() *FigmaClient {
 	return &FigmaClient{
-		apiToken: apiToken,
 		httpClient: &http.Client{
 			Timeout: DefaultTimeout,
 		},
@@ -34,10 +31,9 @@ func NewFigmaClient(apiToken string) *FigmaClient {
 	}
 }
 
-// NewFigmaClientWithTimeout creates a new Figma API client with custom timeout
-func NewFigmaClientWithTimeout(apiToken string, timeout time.Duration) *FigmaClient {
+// not used for now, but can be used to create a client with custom timeout
+func NewFigmaClientWithTimeout(timeout time.Duration) *FigmaClient {
 	return &FigmaClient{
-		apiToken: apiToken,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
@@ -46,7 +42,7 @@ func NewFigmaClientWithTimeout(apiToken string, timeout time.Duration) *FigmaCli
 }
 
 // GetFile retrieves complete file data from Figma API
-func (c *FigmaClient) GetFile(fileKeyOrURL string) (*FigmaAPIResponse, error) {
+func (c *FigmaClient) GetFile(ctx context.Context, fileKeyOrURL string) (*FigmaAPIResponse, error) {
 	if fileKeyOrURL == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
@@ -55,7 +51,7 @@ func (c *FigmaClient) GetFile(fileKeyOrURL string) (*FigmaAPIResponse, error) {
 	fileKey := c.extractFileKeyFromURL(fileKeyOrURL)
 	endpoint := fmt.Sprintf("%s/files/%s", c.baseURL, fileKey)
 
-	response, err := c.makeRequest("GET", endpoint, nil)
+	response, err := c.makeRequest(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
 	}
@@ -69,7 +65,7 @@ func (c *FigmaClient) GetFile(fileKeyOrURL string) (*FigmaAPIResponse, error) {
 }
 
 // GetFileNodes retrieves specific nodes from a Figma file
-func (c *FigmaClient) GetFileNodes(fileKey string, nodeIDs []string) (*FigmaAPIResponse, error) {
+func (c *FigmaClient) GetFileNodes(ctx context.Context, fileKey string, nodeIDs []string) (*FigmaAPIResponse, error) {
 	if fileKey == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
@@ -88,7 +84,7 @@ func (c *FigmaClient) GetFileNodes(fileKey string, nodeIDs []string) (*FigmaAPIR
 	params.Add("ids", strings.Join(nodeIDs, ","))
 	endpoint += "?" + params.Encode()
 
-	response, err := c.makeRequest("GET", endpoint, nil)
+	response, err := c.makeRequest(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file nodes from Figma API: %w", err)
 	}
@@ -102,7 +98,7 @@ func (c *FigmaClient) GetFileNodes(fileKey string, nodeIDs []string) (*FigmaAPIR
 }
 
 // GetFileImages retrieves rendered images for specific nodes
-func (c *FigmaClient) GetFileImages(fileKey string, nodeIDs []string) (map[string]string, error) {
+func (c *FigmaClient) GetFileImages(ctx context.Context, fileKey string, nodeIDs []string) (map[string]string, error) {
 	if fileKey == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
@@ -123,7 +119,7 @@ func (c *FigmaClient) GetFileImages(fileKey string, nodeIDs []string) (map[strin
 	params.Add("scale", "1")    // Default scale, could be configurable
 	endpoint += "?" + params.Encode()
 
-	response, err := c.makeRequest("GET", endpoint, nil)
+	response, err := c.makeRequest(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file images from Figma API: %w", err)
 	}
@@ -145,14 +141,20 @@ func (c *FigmaClient) GetFileImages(fileKey string, nodeIDs []string) (map[strin
 }
 
 // makeRequest is a helper method to make HTTP requests to Figma API
-func (c *FigmaClient) makeRequest(method, endpoint string, body io.Reader) ([]byte, error) {
+func (c *FigmaClient) makeRequest(ctx context.Context, method, endpoint string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, endpoint, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
+	// Get the Figma token from context
+	figmaToken, ok := ctx.Value("figma_token").(string)
+	if !ok || figmaToken == "" {
+		return nil, fmt.Errorf("figma token is required")
+	}
+
 	// Set required headers
-	req.Header.Set("X-Figma-Token", c.apiToken)
+	req.Header.Set("X-Figma-Token", figmaToken)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "figma-parser-app/1.0")
 
@@ -200,12 +202,25 @@ func (c *FigmaClient) extractFileKeyFromURL(input string) string {
 }
 
 // ValidateAPIToken checks if the API token is valid by making a simple request
-func (c *FigmaClient) ValidateAPIToken() error {
-	endpoint := fmt.Sprintf("%s/me", c.baseURL)
+func (c *FigmaClient) ValidateAPIToken(apiToken string) error {
+	if apiToken == "" {
+		return fmt.Errorf("Figma token is required")
+	}
 
-	_, err := c.makeRequest("GET", endpoint, nil)
+	endpoint := fmt.Sprintf("%s/me", c.baseURL)
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "figma_token", apiToken)
+
+	_, err := c.makeRequest(ctx, "GET", endpoint, nil)
 	if err != nil {
-		return fmt.Errorf("invalid API token: %w", err)
+		// For token validation, provide more specific error messages
+		if strings.Contains(err.Error(), "forbidden") {
+			return fmt.Errorf("invalid or expired Figma token")
+		}
+		if strings.Contains(err.Error(), "unauthorized") {
+			return fmt.Errorf("invalid Figma token format or token not recognized")
+		}
+		return fmt.Errorf("token validation failed: %w", err)
 	}
 
 	return nil

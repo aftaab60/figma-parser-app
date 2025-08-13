@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"parser-service/internal/errors"
 	"parser-service/services"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,4 +43,32 @@ func (h *ParserHandler) ParseAndSaveFigmaFile(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": savedFile})
+}
+
+func (h *ParserHandler) GetFigmaFileDetails(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Get file ID from URL parameter
+	fileIDStr := c.Param("id")
+	fileID, err := strconv.ParseInt(fileIDStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, errors.ErrorResponse{
+			Err:     "Invalid file ID",
+			Status:  http.StatusBadRequest,
+			Message: "File ID must be a valid number",
+		})
+		return
+	}
+
+	fileDetails, err := h.ParserService.GetFigmaFileWithDetails(ctx, fileID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, errors.ErrorResponse{
+			Err:     "Failed to get file details",
+			Status:  http.StatusInternalServerError,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": fileDetails})
 }

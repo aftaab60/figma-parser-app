@@ -1,6 +1,7 @@
 package figma_manager_test
 
 import (
+	"context"
 	"os"
 	"parser-service/internal/figma_manager"
 	"testing"
@@ -12,13 +13,14 @@ func TestFigmaManager_Integration_SampleData(t *testing.T) {
 	if apiToken == "" {
 		t.Fatal("FIGMA_API_TOKEN environment variable not set")
 	}
+	ctx := context.WithValue(context.Background(), "figma_token", apiToken)
 	figmaURL := "https://www.figma.com/design/DNCLfE7Tf8A0mudOOLZUYx/Locofy.ai.test?t=94QjDVDsuj5cHJEU-1"
 
 	t.Run("Test URL Extraction", func(t *testing.T) {
-		manager := figma_manager.NewFigmaManager(apiToken)
+		manager := figma_manager.NewFigmaManager()
 
 		// Test parsing through ParseFigmaFileFromURL to verify URL extraction
-		parsedData, err := manager.ParseFigmaFileFromURL(figmaURL)
+		parsedData, err := manager.ParseFigmaFileFromURL(ctx, figmaURL)
 		if err != nil {
 			t.Fatalf("Failed to parse Figma file from URL: %v", err)
 		}
@@ -36,9 +38,9 @@ func TestFigmaManager_Integration_SampleData(t *testing.T) {
 	})
 
 	t.Run("Test Complete File Parsing", func(t *testing.T) {
-		manager := figma_manager.NewFigmaManager(apiToken)
+		manager := figma_manager.NewFigmaManager()
 
-		parsedData, err := manager.ParseFigmaFileFromURL(figmaURL)
+		parsedData, err := manager.ParseFigmaFileFromURL(ctx, figmaURL)
 		if err != nil {
 			t.Fatalf("Failed to parse Figma file: %v", err)
 		}
@@ -87,10 +89,10 @@ func TestFigmaManager_Integration_SampleData(t *testing.T) {
 	})
 
 	t.Run("Test Components Only Extraction", func(t *testing.T) {
-		manager := figma_manager.NewFigmaManager(apiToken)
+		manager := figma_manager.NewFigmaManager()
 		fileKey := "DNCLfE7Tf8A0mudOOLZUYx"
 
-		components, err := manager.ExtractComponentsFromFile(fileKey)
+		components, err := manager.ExtractComponentsFromFile(ctx, fileKey)
 		if err != nil {
 			t.Fatalf("Failed to extract components: %v", err)
 		}
@@ -111,11 +113,11 @@ func TestFigmaManager_Integration_SampleData(t *testing.T) {
 	})
 
 	t.Run("Test Instances Only Extraction", func(t *testing.T) {
-		manager := figma_manager.NewFigmaManager(apiToken)
+		manager := figma_manager.NewFigmaManager()
 		fileKey := "DNCLfE7Tf8A0mudOOLZUYx"
 
 		// First extract components to see what's available
-		components, err := manager.ExtractComponentsFromFile(fileKey)
+		components, err := manager.ExtractComponentsFromFile(ctx, fileKey)
 		if err != nil {
 			t.Fatalf("Failed to extract components: %v", err)
 		}
@@ -129,7 +131,7 @@ func TestFigmaManager_Integration_SampleData(t *testing.T) {
 			}
 		}
 
-		instances, err := manager.ExtractInstancesFromFile(fileKey)
+		instances, err := manager.ExtractInstancesFromFile(ctx, fileKey)
 		if err != nil {
 			t.Fatalf("Failed to extract instances: %v", err)
 		}
@@ -168,10 +170,10 @@ func TestFigmaManager_Integration_SampleData(t *testing.T) {
 	})
 
 	t.Run("Test File Parsing With Images", func(t *testing.T) {
-		manager := figma_manager.NewFigmaManager(apiToken)
+		manager := figma_manager.NewFigmaManager()
 		fileKey := "DNCLfE7Tf8A0mudOOLZUYx"
 
-		parsedData, images, err := manager.ParseFigmaFileWithImages(fileKey)
+		parsedData, images, err := manager.ParseFigmaFileWithImages(ctx, fileKey)
 		if err != nil {
 			t.Fatalf("Failed to parse file with images: %v", err)
 		}

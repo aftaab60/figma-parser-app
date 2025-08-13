@@ -1,6 +1,7 @@
 package figma_manager
 
 import (
+	"context"
 	"fmt"
 	"parser-service/models"
 	"regexp"
@@ -9,15 +10,17 @@ import (
 
 // Having FigmaManager as iterface just in case we want to mock it in tests OR use a different implementation in the future
 type IFigmaManager interface {
-	ParseFigmaFileFromURL(figmaURL string) (*ParsedFigmaData, error)
-	ParseFigmaFileFromKey(fileKey string) (*ParsedFigmaData, error)
+	ParseFigmaFileFromURL(ctx context.Context, figmaURL string) (*ParsedFigmaData, error)
+	ParseFigmaFileFromKey(ctx context.Context, fileKey string) (*ParsedFigmaData, error)
 
-	ExtractComponentsFromFile(fileKey string) ([]models.Component, error)
-	ExtractInstancesFromFile(fileKey string) ([]models.Instance, error)
-	ParseFigmaFileWithImages(fileKey string) (*ParsedFigmaData, map[string]string, error)
-	GetFileImages(fileKey string, nodeIDs []string) (map[string]string, error)
-	GetFileNodes(fileKey string, nodeIDs []string) (*FigmaAPIResponse, error)
-	ValidateFileAccess(fileKey string) error
+	ExtractComponentsFromFile(ctx context.Context, fileKey string) ([]models.Component, error)
+	ExtractInstancesFromFile(ctx context.Context, fileKey string) ([]models.Instance, error)
+	ParseFigmaFileWithImages(ctx context.Context, fileKey string) (*ParsedFigmaData, map[string]string, error)
+	GetFileImages(ctx context.Context, fileKey string, nodeIDs []string) (map[string]string, error)
+	GetFileNodes(ctx context.Context, fileKey string, nodeIDs []string) (*FigmaAPIResponse, error)
+	ValidateFileAccess(ctx context.Context, fileKey string) error
+
+	ValidateFigmaToken(token string) error
 }
 
 // FigmaManager implements the IFigmaManager interface
@@ -26,8 +29,8 @@ type FigmaManager struct {
 	parser *FigmaParser
 }
 
-func NewFigmaManager(apiToken string) *FigmaManager {
-	client := NewFigmaClient(apiToken)
+func NewFigmaManager() *FigmaManager {
+	client := NewFigmaClient()
 	parser := NewFigmaParser()
 
 	return &FigmaManager{
@@ -37,7 +40,7 @@ func NewFigmaManager(apiToken string) *FigmaManager {
 }
 
 // ParseFigmaFileFromURL parses a Figma file from URL and returns structured data
-func (m *FigmaManager) ParseFigmaFileFromURL(figmaURL string) (*ParsedFigmaData, error) {
+func (m *FigmaManager) ParseFigmaFileFromURL(ctx context.Context, figmaURL string) (*ParsedFigmaData, error) {
 	// Extract file key from URL
 	fileKey, err := m.extractFileKeyFromURL(figmaURL)
 	if err != nil {
@@ -45,7 +48,7 @@ func (m *FigmaManager) ParseFigmaFileFromURL(figmaURL string) (*ParsedFigmaData,
 	}
 
 	// Get file data from Figma API
-	apiResponse, err := m.client.GetFile(fileKey)
+	apiResponse, err := m.client.GetFile(ctx, fileKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
 	}
@@ -60,13 +63,13 @@ func (m *FigmaManager) ParseFigmaFileFromURL(figmaURL string) (*ParsedFigmaData,
 }
 
 // ParseFigmaFileFromKey parses a Figma file from file key and returns structured data
-func (m *FigmaManager) ParseFigmaFileFromKey(fileKey string) (*ParsedFigmaData, error) {
+func (m *FigmaManager) ParseFigmaFileFromKey(ctx context.Context, fileKey string) (*ParsedFigmaData, error) {
 	if fileKey == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
 
 	// Get file data from Figma API
-	apiResponse, err := m.client.GetFile(fileKey)
+	apiResponse, err := m.client.GetFile(ctx, fileKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
 	}
@@ -81,13 +84,13 @@ func (m *FigmaManager) ParseFigmaFileFromKey(fileKey string) (*ParsedFigmaData, 
 }
 
 // ExtractComponentsFromFile extracts only components from a Figma file
-func (m *FigmaManager) ExtractComponentsFromFile(fileKey string) ([]models.Component, error) {
+func (m *FigmaManager) ExtractComponentsFromFile(ctx context.Context, fileKey string) ([]models.Component, error) {
 	if fileKey == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
 
 	// Get file data from Figma API
-	apiResponse, err := m.client.GetFile(fileKey)
+	apiResponse, err := m.client.GetFile(ctx, fileKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
 	}
@@ -102,13 +105,13 @@ func (m *FigmaManager) ExtractComponentsFromFile(fileKey string) ([]models.Compo
 }
 
 // ExtractInstancesFromFile extracts only instances from a Figma file
-func (m *FigmaManager) ExtractInstancesFromFile(fileKey string) ([]models.Instance, error) {
+func (m *FigmaManager) ExtractInstancesFromFile(ctx context.Context, fileKey string) ([]models.Instance, error) {
 	if fileKey == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
 
 	// Get file data from Figma API
-	apiResponse, err := m.client.GetFile(fileKey)
+	apiResponse, err := m.client.GetFile(ctx, fileKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file from Figma API: %w", err)
 	}
@@ -171,31 +174,31 @@ func isValidFileKey(key string) bool {
 }
 
 // GetFileImages gets images for specific nodes (utility method)
-func (m *FigmaManager) GetFileImages(fileKey string, nodeIDs []string) (map[string]string, error) {
+func (m *FigmaManager) GetFileImages(ctx context.Context, fileKey string, nodeIDs []string) (map[string]string, error) {
 	if fileKey == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
 
-	return m.client.GetFileImages(fileKey, nodeIDs)
+	return m.client.GetFileImages(ctx, fileKey, nodeIDs)
 }
 
 // GetFileNodes gets specific nodes from a file (utility method)
-func (m *FigmaManager) GetFileNodes(fileKey string, nodeIDs []string) (*FigmaAPIResponse, error) {
+func (m *FigmaManager) GetFileNodes(ctx context.Context, fileKey string, nodeIDs []string) (*FigmaAPIResponse, error) {
 	if fileKey == "" {
 		return nil, fmt.Errorf("file key cannot be empty")
 	}
 
-	return m.client.GetFileNodes(fileKey, nodeIDs)
+	return m.client.GetFileNodes(ctx, fileKey, nodeIDs)
 }
 
 // ValidateFileAccess checks if we can access a Figma file
-func (m *FigmaManager) ValidateFileAccess(fileKey string) error {
+func (m *FigmaManager) ValidateFileAccess(ctx context.Context, fileKey string) error {
 	if fileKey == "" {
 		return fmt.Errorf("file key cannot be empty")
 	}
 
 	// Try to get basic file info
-	_, err := m.client.GetFile(fileKey)
+	_, err := m.client.GetFile(ctx, fileKey)
 	if err != nil {
 		return fmt.Errorf("cannot access Figma file: %w", err)
 	}
@@ -204,9 +207,9 @@ func (m *FigmaManager) ValidateFileAccess(fileKey string) error {
 }
 
 // ParseFigmaFileWithImages parses a file and also fetches images for components
-func (m *FigmaManager) ParseFigmaFileWithImages(fileKey string) (*ParsedFigmaData, map[string]string, error) {
+func (m *FigmaManager) ParseFigmaFileWithImages(ctx context.Context, fileKey string) (*ParsedFigmaData, map[string]string, error) {
 	// First parse the file normally
-	parsedData, err := m.ParseFigmaFileFromKey(fileKey)
+	parsedData, err := m.ParseFigmaFileFromKey(ctx, fileKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -231,7 +234,7 @@ func (m *FigmaManager) ParseFigmaFileWithImages(fileKey string) (*ParsedFigmaDat
 	// Get images if we have node IDs
 	var images map[string]string
 	if len(nodeIDs) > 0 {
-		images, err = m.client.GetFileImages(fileKey, nodeIDs)
+		images, err = m.client.GetFileImages(ctx, fileKey, nodeIDs)
 		if err != nil {
 			// Don't fail the whole operation if images fail
 			// Just log and continue
@@ -242,4 +245,13 @@ func (m *FigmaManager) ParseFigmaFileWithImages(fileKey string) (*ParsedFigmaDat
 	}
 
 	return parsedData, images, nil
+}
+
+func (m *FigmaManager) ValidateFigmaToken(token string) error {
+	if token == "" {
+		return fmt.Errorf("Figma token cannot be empty")
+	}
+
+	// Use the client to validate the token
+	return m.client.ValidateAPIToken(token)
 }

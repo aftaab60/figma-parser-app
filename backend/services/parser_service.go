@@ -32,7 +32,7 @@ func NewParserService(
 // ParseAndSaveFigmaFile - Main method that accepts Figma URL and saves all extracted data
 func (s *ParserService) ParseAndSaveFigmaFile(ctx context.Context, figmaURL string) (*models.FigmaFile, error) {
 	// 1. Parse Figma file from URL
-	parsedData, err := s.FigmaManager.ParseFigmaFileFromURL(figmaURL)
+	parsedData, err := s.FigmaManager.ParseFigmaFileFromURL(ctx, figmaURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse Figma file: %w", err)
 	}
@@ -101,15 +101,15 @@ func (s *ParserService) GetInstancesByFileID(ctx context.Context, fileID int64) 
 }
 
 // ValidateFigmaURL - Check if a Figma URL is accessible before parsing
-func (s *ParserService) ValidateFigmaURL(figmaURL string) error {
+func (s *ParserService) ValidateFigmaURL(ctx context.Context, figmaURL string) error {
 	// Extract file key from URL and validate access
-	parsedData, err := s.FigmaManager.ParseFigmaFileFromURL(figmaURL)
+	parsedData, err := s.FigmaManager.ParseFigmaFileFromURL(ctx, figmaURL)
 	if err != nil {
 		return fmt.Errorf("invalid Figma URL or inaccessible file: %w", err)
 	}
 
 	// Just validate access, don't save anything
-	return s.FigmaManager.ValidateFileAccess(parsedData.File.FileKey)
+	return s.FigmaManager.ValidateFileAccess(ctx, parsedData.File.FileKey)
 }
 
 // saveComponents saves components and returns the saved components with database IDs
